@@ -20,19 +20,13 @@ export default function PortfolioPage() {
     if (!user) return
     setUser(user)
 
-    // Fetch user's investments with project details
     const { data: investmentsData } = await supabase
       .from('investments')
       .select(`
         *,
         projects (
-          id,
-          name,
-          category,
-          location,
-          annual_return,
-          duration_months,
-          impact_tons_co2
+          id, name, category, location,
+          annual_return, duration_months, impact_tons_co2
         )
       `)
       .eq('user_id', user.id)
@@ -40,16 +34,15 @@ export default function PortfolioPage() {
 
     setInvestments(investmentsData || [])
     
-    // Calculate totals
-    const invested = investmentsData?.reduce((sum, inv) => sum + inv.amount, 0) || 0
+    const invested = investmentsData?.reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0) || 0
     const returns = investmentsData?.reduce((sum, inv) => {
-      const monthlyReturn = (inv.projects.annual_return / 100) / 12
+      const monthlyReturn = (Number(inv.projects.annual_return) || 0) / 100 / 12
       const monthsPassed = Math.min(
         Math.floor((new Date() - new Date(inv.invested_at)) / (1000 * 60 * 60 * 24 * 30)),
-        inv.projects.duration_months
+        Number(inv.projects.duration_months) || 0
       )
-      const earned = inv.amount * monthlyReturn * monthsPassed
-      return sum + earned
+      const earned = (Number(inv.amount) || 0) * monthlyReturn * monthsPassed
+      return sum + (isNaN(earned) ? 0 : earned)
     }, 0) || 0
     
     setTotalInvested(invested)
@@ -58,33 +51,21 @@ export default function PortfolioPage() {
     setLoading(false)
   }
 
-  // Generate growth data for chart
   const generateGrowthData = () => {
-    const data = []
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-    let value = totalInvested
-    
-    for (let i = 0; i < months.length; i++) {
-      value = value + (totalReturns / months.length)
-      data.push({
-        month: months[i],
-        value: Math.round(value)
-      })
-    }
-    return data
+    const startValue = totalInvested > 0 ? totalInvested : 100
+    const step = totalReturns / 6
+    return months.map((month, i) => ({
+      month,
+      value: Math.round(startValue + (step * i))
+    }))
   }
 
-  const calculateExpectedReturn = (investment) => {
-    const totalReturn = investment.amount * (1 + (investment.projects.annual_return / 100) * (investment.projects.duration_months / 12))
-    return totalReturn.toFixed(2)
-  }
-
-  const calculateProgress = (investment) => {
-    const monthsPassed = Math.min(
-      Math.floor((new Date() - new Date(investment.invested_at)) / (1000 * 60 * 60 * 24 * 30)),
-      investment.projects.duration_months
-    )
-    return (monthsPassed / investment.projects.duration_months) * 100
+  const formatCurrency = (value) => {
+    if (!value || value === 0) return '$0'
+    if (value < 1000) return `$${Math.round(value)}`
+    if (value < 1000000) return `$${(value / 1000).toFixed(1)}K`
+    return `$${(value / 1000000).toFixed(1)}M`
   }
 
   if (loading) {
@@ -102,126 +83,134 @@ export default function PortfolioPage() {
     <div className="min-h-screen bg-gray-50 p-4 pb-20">
       <div className="max-w-md mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-green-800">📈 My Portfolio</h1>
-          <p className="text-sm text-gray-500">Track your green investments</p>
+        <div className="mb-5">
+          <h1 className="text-xl font-bold text-green-800">📈 My Portfolio</h1>
+          <p className="text-xs text-gray-500">Track your green investments</p>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        {/* Summary Cards - Mobile Optimized */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
           <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <p className="text-xs text-gray-500">Invested</p>
-            <p className="text-lg font-bold text-green-600">${totalInvested.toLocaleString()}</p>
+            <p className="text-[10px] text-gray-500">Invested</p>
+            <p className="text-base font-bold text-green-600">{formatCurrency(totalInvested)}</p>
           </div>
           <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <p className="text-xs text-gray-500">Returns</p>
-            <p className="text-lg font-bold text-blue-600">${Math.round(totalReturns).toLocaleString()}</p>
+            <p className="text-[10px] text-gray-500">Returns</p>
+            <p className="text-base font-bold text-blue-600">{formatCurrency(totalReturns)}</p>
           </div>
           <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <p className="text-xs text-gray-500">Active</p>
-            <p className="text-lg font-bold text-gray-700">{activeProjects}</p>
+            <p className="text-[10px] text-gray-500">Active</p>
+            <p className="text-base font-bold text-gray-700">{activeProjects}</p>
           </div>
         </div>
 
         {/* Portfolio Value Card */}
-        <div className="bg-gradient-to-r from-green-700 to-green-500 text-white rounded-2xl p-5 mb-6 shadow-lg">
-          <p className="text-sm opacity-90">Portfolio Value</p>
-          <p className="text-3xl font-bold mt-1">${Math.round(totalInvested + totalReturns).toLocaleString()}</p>
-          <p className="text-xs opacity-80 mt-2">
-            +${Math.round(totalReturns).toLocaleString()} earned
+        <div className="bg-gradient-to-r from-green-700 to-green-500 text-white rounded-xl p-4 mb-5 shadow-lg">
+          <p className="text-xs opacity-90">Portfolio Value</p>
+          <p className="text-2xl font-bold mt-1">{formatCurrency(totalInvested + totalReturns)}</p>
+          <p className="text-[10px] opacity-80 mt-1">
+            +{formatCurrency(totalReturns)} earned
           </p>
         </div>
 
-        {/* Growth Chart */}
-        {investments.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm p-5 mb-6">
-            <h3 className="font-semibold text-gray-800 mb-3">Portfolio Growth</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={generateGrowthData()}>
-                <XAxis dataKey="month" stroke="#888" fontSize={12} />
-                <YAxis stroke="#888" fontSize={12} />
-                <Tooltip />
-                <Line type="monotone" dataKey="value" stroke="#16a34a" strokeWidth={2} dot={{ fill: '#16a34a' }} />
-              </LineChart>
-            </ResponsiveContainer>
+        {/* Growth Chart - Only show if has investments */}
+        {investments.length > 0 && totalInvested > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-3 mb-5">
+            <h3 className="font-semibold text-sm text-gray-800 mb-2">Portfolio Growth</h3>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={generateGrowthData()}>
+                  <XAxis dataKey="month" stroke="#888" fontSize={10} tick={{ fontSize: 10 }} />
+                  <YAxis stroke="#888" fontSize={10} tick={{ fontSize: 10 }} tickFormatter={(v) => formatCurrency(v)} />
+                  <Tooltip formatter={(v) => formatCurrency(v)} />
+                  <Line type="monotone" dataKey="value" stroke="#16a34a" strokeWidth={2} dot={{ fill: '#16a34a', r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
 
         {/* Active Investments */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-gray-800">Active Investments</h3>
+        <div className="space-y-3">
+          <h3 className="font-semibold text-sm text-gray-800">Active Investments</h3>
           
           {investments.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center">
-              <div className="text-4xl mb-2">🌱</div>
-              <p className="text-gray-500">No investments yet</p>
+            <div className="bg-white rounded-xl p-6 text-center">
+              <div className="text-3xl mb-2">🌱</div>
+              <p className="text-gray-500 text-sm">No investments yet</p>
               <p className="text-xs text-gray-400 mt-1">Browse projects to start investing</p>
             </div>
           ) : (
-            investments.map((inv, idx) => (
-              <div key={inv.id} className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h4 className="font-bold text-gray-800">{inv.projects.name}</h4>
-                    <p className="text-xs text-gray-500">{inv.projects.location}</p>
+            investments.map((inv) => {
+              const progress = (() => {
+                const monthsPassed = Math.min(
+                  Math.floor((new Date() - new Date(inv.invested_at)) / (1000 * 60 * 60 * 24 * 30)),
+                  Number(inv.projects.duration_months) || 1
+                )
+                return (monthsPassed / (Number(inv.projects.duration_months) || 1)) * 100
+              })()
+              
+              const expectedReturn = (Number(inv.amount) || 0) * (1 + (Number(inv.projects.annual_return) || 0) / 100 * (Number(inv.projects.duration_months) || 0) / 12)
+              
+              return (
+                <div key={inv.id} className="bg-white rounded-xl shadow-sm p-3 border border-gray-100">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h4 className="font-bold text-sm text-gray-800">{inv.projects.name}</h4>
+                      <p className="text-[10px] text-gray-500">{inv.projects.location}</p>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 bg-green-50 text-green-700 rounded-full">
+                      {inv.projects.annual_return}% p.a.
+                    </span>
                   </div>
-                  <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-full">
-                    {inv.projects.annual_return}% p.a.
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-3 text-center">
-                  <div>
-                    <p className="text-xs text-gray-500">Invested</p>
-                    <p className="font-semibold text-gray-800">${inv.amount}</p>
+                  <div className="grid grid-cols-3 gap-2 mb-2 text-center">
+                    <div>
+                      <p className="text-[9px] text-gray-500">Invested</p>
+                      <p className="font-semibold text-xs">{formatCurrency(inv.amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-gray-500">Expected</p>
+                      <p className="font-semibold text-xs text-green-600">{formatCurrency(expectedReturn)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-gray-500">Duration</p>
+                      <p className="font-semibold text-xs">{inv.projects.duration_months}m</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Expected</p>
-                    <p className="font-semibold text-green-600">${calculateExpectedReturn(inv)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Duration</p>
-                    <p className="font-semibold text-gray-800">{inv.projects.duration_months}m</p>
-                  </div>
-                </div>
 
-                {/* Progress Bar */}
-                <div className="mb-2">
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>Progress</span>
-                    <span>{Math.round(calculateProgress(inv))}%</span>
+                  {/* Progress Bar */}
+                  <div className="mb-2">
+                    <div className="flex justify-between text-[9px] text-gray-500 mb-0.5">
+                      <span>Progress</span>
+                      <span>{Math.min(Math.round(progress), 100)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div className="bg-green-600 h-1.5 rounded-full" style={{ width: `${Math.min(progress, 100)}%` }} />
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full transition-all" 
-                      style={{ width: `${calculateProgress(inv)}%` }}
-                    />
-                  </div>
-                </div>
 
-                {/* Impact */}
-                <div className="flex items-center gap-2 text-xs text-green-600 mt-2">
-                  <span>🌱</span>
-                  <span>{(inv.amount / 1000 * inv.projects.impact_tons_co2).toFixed(1)} tons CO₂ saved</span>
+                  {/* Impact */}
+                  <div className="flex items-center gap-1.5 text-[10px] text-green-600">
+                    <span>🌱</span>
+                    <span>{(Number(inv.amount) / 1000 * (inv.projects.impact_tons_co2 || 0)).toFixed(1)} tons CO₂ saved</span>
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
 
         {/* Reinvest Suggestion */}
-        {totalReturns > 0 && (
-          <div className="mt-6 bg-green-50 rounded-2xl p-4 border border-green-100">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🔄</span>
+        {totalReturns > 100 && (
+          <div className="mt-5 bg-green-50 rounded-xl p-3 border border-green-100">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔄</span>
               <div className="flex-1">
-                <p className="font-semibold text-green-800">Reinvest your returns</p>
-                <p className="text-xs text-green-600">${Math.round(totalReturns).toLocaleString()} available to reinvest</p>
+                <p className="font-semibold text-sm text-green-800">Reinvest your returns</p>
+                <p className="text-[10px] text-green-600">{formatCurrency(totalReturns)} available to reinvest</p>
               </div>
-              <button 
-                onClick={() => alert('Coming soon: Auto-reinvest feature')}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold"
-              >
+              <button className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold">
                 Reinvest
               </button>
             </div>

@@ -26,9 +26,9 @@ export default function Landing() {
 
   // Fetch stats for landing page
   const [stats, setStats] = useState({
-    investors: 'Loading...',
-    projects: 'Loading...',
-    co2_saved: 'Loading...'
+    investors: '...',
+    projects: '...',
+    co2_saved: '...'
   })
 
   useEffect(() => {
@@ -174,7 +174,7 @@ export default function Landing() {
           <h1 className="text-4xl font-bold mb-2">🌍 Gain</h1>
           <p className="text-green-100 text-lg">Green Africa Investment Network</p>
           <p className="text-green-50 text-sm mt-4 max-w-xs mx-auto">
-            Invest in Africa's green future. From $10, earn up to 19% p.a.
+            Invest in Africa's green future.
           </p>
         </div>
       </div>
