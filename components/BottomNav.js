@@ -1,9 +1,23 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function BottomNav() {
   const path = usePathname()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    checkAdmin()
+  }, [])
+
+  async function checkAdmin() {
+    const { data: { session } } = await supabase.auth.getSession()
+    setIsAdmin(session?.user?.email === 'admin@gain.africa')
+    setLoading(false)
+  }
 
   const tabs = [
     { 
@@ -53,11 +67,9 @@ export default function BottomNav() {
     }
   ]
 
-  // Only show Admin tab for admin users (optional - check session)
-  // For now, add it conditionally if you want
   const adminTab = { 
     name: 'Admin', 
-    href: '/admin/projects',
+    href: '/admin',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -65,8 +77,10 @@ export default function BottomNav() {
     )
   }
 
+  if (loading) return null
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 shadow-lg">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 shadow-lg z-50">
       <div className="flex justify-around items-center px-2 py-1 max-w-md mx-auto">
         {tabs.map((tab) => (
           <Link
@@ -87,23 +101,24 @@ export default function BottomNav() {
           </Link>
         ))}
         
-        {/* Optional: Add Admin tab - only show for admin users */}
-        {/* Uncomment below if you want Admin tab always visible */}
-        {/* <Link
-          href="/admin/projects"
-          className={`flex flex-col items-center justify-center min-w-[56px] py-1 px-2 rounded-xl transition-all duration-200 ${
-            path === '/admin/projects' 
-              ? 'text-green-600 bg-green-50' 
-              : 'text-gray-500 active:bg-gray-100'
-          }`}
-        >
-          <div className={`transform transition-transform ${path === '/admin/projects' ? 'scale-110' : 'scale-100'}`}>
-            {adminTab.icon}
-          </div>
-          <span className={`text-[10px] font-medium mt-1 ${path === '/admin/projects' ? 'text-green-600' : 'text-gray-500'}`}>
-            Admin
-          </span>
-        </Link> */}
+        {/* Admin Tab - only visible to admin users */}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={`flex flex-col items-center justify-center min-w-[56px] py-1 px-2 rounded-xl transition-all duration-200 ${
+              path === '/admin' || path.startsWith('/admin/')
+                ? 'text-green-600 bg-green-50' 
+                : 'text-gray-500 active:bg-gray-100'
+            }`}
+          >
+            <div className={`transform transition-transform ${path === '/admin' || path.startsWith('/admin/') ? 'scale-110' : 'scale-100'}`}>
+              {adminTab.icon}
+            </div>
+            <span className={`text-[10px] font-medium mt-1 ${path === '/admin' || path.startsWith('/admin/') ? 'text-green-600' : 'text-gray-500'}`}>
+              {adminTab.name}
+            </span>
+          </Link>
+        )}
       </div>
     </div>
   )
