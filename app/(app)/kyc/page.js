@@ -101,33 +101,48 @@ export default function KYCPage() {
       alert('Please fill in all required fields')
       return
     }
-
+  
     if (!frontFile) {
       alert('Please upload the front side of your ID')
       return
     }
-
+  
     setSubmitting(true)
-
+  
     try {
-      // Upload ID images
-      const frontFileName = `${user.id}/front_${Date.now()}.${frontFile.name.split('.').pop()}`
+      // REMOVE the bucket check - just try to upload directly
+      // The bucket exists, so we don't need to check first
+      
+      // Upload front ID
+      const fileExt = frontFile.name.split('.').pop()
+      const frontFileName = `${user.id}/front_${Date.now()}.${fileExt}`
       
       const { error: frontError } = await supabase.storage
         .from('kyc_docs')
-        .upload(frontFileName, frontFile)
-
-      if (frontError) throw new Error('Failed to upload front ID')
-
+        .upload(frontFileName, frontFile, {
+          cacheControl: '3600',
+          upsert: true
+        })
+  
+      if (frontError) {
+        console.error('Front upload error:', frontError)
+        throw new Error('Failed to upload front ID: ' + frontError.message)
+      }
+  
       let backUrl = null
       if (backFile) {
-        const backFileName = `${user.id}/back_${Date.now()}.${backFile.name.split('.').pop()}`
+        const backFileExt = backFile.name.split('.').pop()
+        const backFileName = `${user.id}/back_${Date.now()}.${backFileExt}`
         const { error: backError } = await supabase.storage
           .from('kyc_docs')
-          .upload(backFileName, backFile)
+          .upload(backFileName, backFile, {
+            cacheControl: '3600',
+            upsert: true
+          })
+        
         if (!backError) backUrl = backFileName
       }
-
+  
       // Update user profile
       const { error: updateError } = await supabase
         .from('users')
@@ -145,11 +160,11 @@ export default function KYCPage() {
           kyc_status: 'pending'
         })
         .eq('id', user.id)
-
+  
       if (updateError) throw updateError
-
-      alert('✅ KYC submitted successfully! Our team will review your documents.')
-      setKycStatus('pending')
+  
+      alert('✅ KYC submitted successfully! Our team will review your documents within 24-48 hours.')
+      router.push('/dashboard')
       
     } catch (error) {
       console.error('KYC submission error:', error)
