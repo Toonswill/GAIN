@@ -30,11 +30,11 @@ export default function BottomNav() {
       )
     },
     { 
-      name: 'Projects', 
-      href: '/projects',
+      name: 'Invest', 
+      href: '/invest',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.66 0 3-4 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4-3-9s1.34-9 3-9" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       )
     },
@@ -87,15 +87,15 @@ export default function BottomNav() {
             key={tab.href}
             href={tab.href}
             className={`flex flex-col items-center justify-center min-w-[56px] py-1 px-2 rounded-xl transition-all duration-200 ${
-              path === tab.href 
+              path === tab.href || (tab.href === '/invest' && path.startsWith('/invest/'))
                 ? 'text-green-600 bg-green-50' 
                 : 'text-gray-500 active:bg-gray-100'
             }`}
           >
-            <div className={`transform transition-transform ${path === tab.href ? 'scale-110' : 'scale-100'}`}>
+            <div className={`transform transition-transform ${path === tab.href || (tab.href === '/invest' && path.startsWith('/invest/')) ? 'scale-110' : 'scale-100'}`}>
               {tab.icon}
             </div>
-            <span className={`text-[10px] font-medium mt-1 ${path === tab.href ? 'text-green-600' : 'text-gray-500'}`}>
+            <span className={`text-[10px] font-medium mt-1 ${path === tab.href || (tab.href === '/invest' && path.startsWith('/invest/')) ? 'text-green-600' : 'text-gray-500'}`}>
               {tab.name}
             </span>
           </Link>
