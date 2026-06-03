@@ -1,14 +1,32 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function BottomNav() {
   const path = usePathname()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [homeHref, setHomeHref] = useState('/dashboard')
+
+  useEffect(() => {
+    checkAdmin()
+  }, [])
+
+  async function checkAdmin() {
+    const { data: { session } } = await supabase.auth.getSession()
+    const admin = session?.user?.email === 'admin@gain.africa'
+    setIsAdmin(admin)
+    // Set home href based on role
+    setHomeHref(admin ? '/admin' : '/dashboard')
+    setLoading(false)
+  }
 
   const tabs = [
     { 
       name: 'Home', 
-      href: '/dashboard',
+      href: homeHref,  // Dynamic based on admin status
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -16,11 +34,11 @@ export default function BottomNav() {
       )
     },
     { 
-      name: 'Projects', 
-      href: '/projects',
+      name: 'Invest', 
+      href: '/invest',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.66 0 3-4 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4-3-9s1.34-9 3-9" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       )
     },
@@ -53,57 +71,29 @@ export default function BottomNav() {
     }
   ]
 
-  // Only show Admin tab for admin users (optional - check session)
-  // For now, add it conditionally if you want
-  const adminTab = { 
-    name: 'Admin', 
-    href: '/admin/projects',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-      </svg>
-    )
-  }
+  if (loading) return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 shadow-lg">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 shadow-lg z-50">
       <div className="flex justify-around items-center px-2 py-1 max-w-md mx-auto">
         {tabs.map((tab) => (
           <Link
             key={tab.href}
             href={tab.href}
             className={`flex flex-col items-center justify-center min-w-[56px] py-1 px-2 rounded-xl transition-all duration-200 ${
-              path === tab.href 
+              path === tab.href || (tab.href === '/invest' && path.startsWith('/invest/'))
                 ? 'text-green-600 bg-green-50' 
                 : 'text-gray-500 active:bg-gray-100'
             }`}
           >
-            <div className={`transform transition-transform ${path === tab.href ? 'scale-110' : 'scale-100'}`}>
+            <div className={`transform transition-transform ${path === tab.href || (tab.href === '/invest' && path.startsWith('/invest/')) ? 'scale-110' : 'scale-100'}`}>
               {tab.icon}
             </div>
-            <span className={`text-[10px] font-medium mt-1 ${path === tab.href ? 'text-green-600' : 'text-gray-500'}`}>
+            <span className={`text-[10px] font-medium mt-1 ${path === tab.href || (tab.href === '/invest' && path.startsWith('/invest/')) ? 'text-green-600' : 'text-gray-500'}`}>
               {tab.name}
             </span>
           </Link>
         ))}
-        
-        {/* Optional: Add Admin tab - only show for admin users */}
-        {/* Uncomment below if you want Admin tab always visible */}
-        {/* <Link
-          href="/admin/projects"
-          className={`flex flex-col items-center justify-center min-w-[56px] py-1 px-2 rounded-xl transition-all duration-200 ${
-            path === '/admin/projects' 
-              ? 'text-green-600 bg-green-50' 
-              : 'text-gray-500 active:bg-gray-100'
-          }`}
-        >
-          <div className={`transform transition-transform ${path === '/admin/projects' ? 'scale-110' : 'scale-100'}`}>
-            {adminTab.icon}
-          </div>
-          <span className={`text-[10px] font-medium mt-1 ${path === '/admin/projects' ? 'text-green-600' : 'text-gray-500'}`}>
-            Admin
-          </span>
-        </Link> */}
       </div>
     </div>
   )

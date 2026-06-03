@@ -1,0 +1,1 @@
+Get-ChildItem -Recurse -Path "app" -Filter "*.js" | Where-Object { $_.FullName -like "*admin*" } | Select-Object FullName
