@@ -7,6 +7,7 @@ export default function InvestorDirectory() {
   const [investors, setInvestors] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [stats, setStats] = useState({ total: 0, pendingKYC: 0, verified: 0 })
   const router = useRouter()
 
   useEffect(() => {
@@ -19,24 +20,66 @@ export default function InvestorDirectory() {
       router.push('/')
       return
     }
-    await fetchInvestors()
+    await fetchAllInvestors()
   }
 
-  async function fetchInvestors() {
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    setInvestors(data || [])
+  async function fetchAllInvestors() {
+    try {
+      // Get all users from auth.users via the RPC function
+      const { data: authUsers, error: authError } = await supabase.rpc('get_all_users')
+      
+      let investorsList = []
+      
+      if (!authError && authUsers && authUsers.length > 0) {
+        // Use auth users data
+        investorsList = authUsers.map(user => ({
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name || user.email?.split('@')[0],
+          last_name: user.last_name || '',
+          kyc_status: user.kyc_status || 'not_submitted',
+          wallet_balance: user.wallet_balance || 0,
+          green_points: user.green_points || 0,
+          country: user.country || 'Not set',
+          phone: user.phone || '',
+          created_at: user.created_at
+        }))
+      } else {
+        // Fallback: Get from public.users
+        const { data: publicUsers } = await supabase.from('users').select('*')
+        investorsList = publicUsers || []
+      }
+      
+      // Calculate stats
+      const total = investorsList.length
+      const pendingKYC = investorsList.filter(i => i.kyc_status === 'pending').length
+      const verified = investorsList.filter(i => i.kyc_status === 'approved').length
+      
+      setStats({ total, pendingKYC, verified })
+      setInvestors(investorsList)
+    } catch (error) {
+      console.error('Error fetching investors:', error)
+      // Fallback to public.users
+      const { data } = await supabase.from('users').select('*').order('created_at', { ascending: false })
+      setInvestors(data || [])
+      setStats({ total: data?.length || 0, pendingKYC: 0, verified: 0 })
+    }
     setLoading(false)
   }
 
-  const filteredInvestors = investors.filter(investor => 
-    investor.email?.toLowerCase().includes(search.toLowerCase()) ||
-    investor.first_name?.toLowerCase().includes(search.toLowerCase()) ||
-    investor.last_name?.toLowerCase().includes(search.toLowerCase())
-  )
+  async function updateKYCStatus(userId, newStatus) {
+    const { error } = await supabase
+      .from('users')
+      .update({ kyc_status: newStatus })
+      .eq('id', userId)
+    
+    if (error) {
+      alert('Error updating KYC: ' + error.message)
+    } else {
+      alert(`KYC status updated to ${newStatus}`)
+      await fetchAllInvestors()
+    }
+  }
 
   const formatCurrency = (value) => {
     if (!value || value === 0) return '$0'
@@ -44,6 +87,12 @@ export default function InvestorDirectory() {
     if (value < 1000000) return `$${(value / 1000).toFixed(1)}K`
     return `$${(value / 1000000).toFixed(1)}M`
   }
+
+  const filteredInvestors = investors.filter(investor => 
+    investor.email?.toLowerCase().includes(search.toLowerCase()) ||
+    investor.first_name?.toLowerCase().includes(search.toLowerCase()) ||
+    (investor.first_name + ' ' + investor.last_name).toLowerCase().includes(search.toLowerCase())
+  )
 
   if (loading) return <div className="p-8 text-center">Loading investor directory...</div>
 
@@ -56,18 +105,18 @@ export default function InvestorDirectory() {
           <p className="text-xs text-gray-500">View all registered investors on Gain</p>
         </div>
 
-        {/* Stats Summary */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-2 mb-4">
           <div className="bg-white rounded-xl p-2 text-center shadow-sm">
-            <p className="text-lg font-bold text-green-600">{investors.length}</p>
+            <p className="text-lg font-bold text-green-600">{stats.total}</p>
             <p className="text-[10px] text-gray-500">Total</p>
           </div>
           <div className="bg-white rounded-xl p-2 text-center shadow-sm">
-            <p className="text-lg font-bold text-yellow-600">{investors.filter(i => i.kyc_status === 'pending').length}</p>
+            <p className="text-lg font-bold text-yellow-600">{stats.pendingKYC}</p>
             <p className="text-[10px] text-gray-500">KYC Pending</p>
           </div>
           <div className="bg-white rounded-xl p-2 text-center shadow-sm">
-            <p className="text-lg font-bold text-green-600">{investors.filter(i => i.kyc_status === 'approved').length}</p>
+            <p className="text-lg font-bold text-green-600">{stats.verified}</p>
             <p className="text-[10px] text-gray-500">Verified</p>
           </div>
         </div>
@@ -100,13 +149,20 @@ export default function InvestorDirectory() {
                     </h3>
                     <p className="text-xs text-gray-500">{investor.email}</p>
                   </div>
-                  <div className={`text-xs px-2 py-1 rounded-full ${
-                    investor.kyc_status === 'approved' ? 'bg-green-100 text-green-700' :
-                    investor.kyc_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-gray-100 text-gray-500'
-                  }`}>
-                    {investor.kyc_status || 'pending'}
-                  </div>
+                  <select
+                    value={investor.kyc_status || 'not_submitted'}
+                    onChange={(e) => updateKYCStatus(investor.id, e.target.value)}
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      investor.kyc_status === 'approved' ? 'bg-green-100 text-green-700' :
+                      investor.kyc_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    <option value="not_submitted">Not Submitted</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs mt-2 pt-2 border-t border-gray-100">
@@ -120,38 +176,13 @@ export default function InvestorDirectory() {
                   </div>
                   <div>
                     <span className="text-gray-500">Country:</span>
-                    <span className="ml-1">{investor.country || '-'}</span>
+                    <span className="ml-1">{investor.country || 'Not set'}</span>
                   </div>
                   <div>
                     <span className="text-gray-500">Joined:</span>
                     <span className="ml-1">{new Date(investor.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
-
-                {investor.kyc_status === 'pending' && (
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={async () => {
-                        await supabase.from('users').update({ kyc_status: 'approved' }).eq('id', investor.id)
-                        await fetchInvestors()
-                        alert(`${investor.first_name} ${investor.last_name} verified!`)
-                      }}
-                      className="flex-1 bg-green-600 text-white py-1 rounded-lg text-xs"
-                    >
-                      Approve KYC
-                    </button>
-                    <button
-                      onClick={async () => {
-                        await supabase.from('users').update({ kyc_status: 'rejected' }).eq('id', investor.id)
-                        await fetchInvestors()
-                        alert(`${investor.first_name} ${investor.last_name} rejected.`)
-                      }}
-                      className="flex-1 bg-red-600 text-white py-1 rounded-lg text-xs"
-                    >
-                      Reject
-                    </button>
-                  </div>
-                )}
               </div>
             ))}
           </div>
